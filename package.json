@@ -1,8 +1,8 @@
 {
   "name": "workstate",
   "displayName": "WorkState",
-  "description": "Local-first context memory for developers continuing work across AI coding sessions.",
-  "version": "0.2.1",
+  "description": "Preserve engineering context across AI coding sessions in VS Code.",
+  "version": "0.2.2",
   "author": {
     "name": "Pranav",
     "url": "https://github.com/pranavv1210"
@@ -21,10 +21,16 @@
     "Other"
   ],
   "keywords": [
-    "ai",
-    "handoff",
     "context",
+    "handoff",
+    "ai-coding",
+    "coding-agents",
+    "developer-memory",
     "local-first",
+    "codex",
+    "claude",
+    "copilot",
+    "gemini",
     "productivity"
   ],
   "activationEvents": [

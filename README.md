@@ -1,163 +1,304 @@
 # WorkState
 
-Your AI conversation can end.  
-Your engineering work doesn't.
+**AI agents are replaceable. Your engineering context isn't.**
 
-## What Is WorkState?
+Your AI conversation can end. Your engineering work doesn't.
 
-WorkState is a local-first developer context layer for AI-assisted engineering work.
+WorkState is a local-first engineering context layer for developers working with AI coding agents. It preserves the important context that should survive AI chat changes, context-window limits, VS Code restarts, working sessions, time away from a project, and switching between tools.
 
-It is not a task manager. It is not a cloud memory service. WorkState helps preserve what changed, what mattered, what was decided, and where you left off so a fresh AI coding session can continue quickly.
-
-The current product direction is simple:
-
-> You don't manage WorkState. WorkState understands your work.
+WorkState is not a task manager, not another AI coding agent, not an AI chat client, and not a cloud memory service. It exists to remember where your engineering work left off.
 
 ## The Problem
 
-AI coding sessions end. Context windows fill up. Developers switch between chats, agents, branches, and work sessions.
+A developer works with Codex for two hours. The conversation understands what they are building, what they discovered, what changed, what failed, what was decided, and what remains.
 
-The same context gets explained again:
+Then the conversation ends.
 
-- what you were building
-- what changed
-- what was already completed
-- what decisions were made
-- what should not be repeated
-- what should happen next
+The developer starts a new Codex conversation, switches to Claude, opens GitHub Copilot, or tries Gemini. The new AI session does not automatically have the previous session's context, so the developer has to explain everything again.
+
+The conversation is temporary. The engineering context should persist.
 
 ## The Solution
 
-WorkState keeps a lightweight local memory of important engineering context.
+WorkState stores useful engineering context locally for the current workspace and turns it into concise continuation context when you need it.
 
-You work normally, capture meaningful moments when needed, and use Continue Work or Handoff when you want a new AI coding session to understand where the previous one stopped.
+```text
+WORK NORMALLY
+      |
+      v
+WORKSTATE REMEMBERS IMPORTANT CONTEXT
+      |
+      v
+AI CHAT ENDS / CONTEXT CHANGES
+      |
+      v
+OPEN NEW AI SESSION
+      |
+      v
+CONTINUE WORK
+      |
+      v
+NEW AI SESSION UNDERSTANDS THE IMPORTANT CONTEXT
+```
+
+The product philosophy is:
+
+> You don't manage WorkState. WorkState understands your work.
+
+## Why WorkState?
+
+AI coding agents are powerful, but their context is usually tied to one chat, one provider, or one session. WorkState keeps the engineering context independent from the AI agent you happen to be using.
+
+It helps answer:
+
+- What was I working on?
+- What did I already finish?
+- What did I decide?
+- What should I not repeat?
+- What files matter?
+- What was I about to do next?
+
+The goal is simple:
+
+Developer: "I forgot where I left off."
+
+WorkState: "I remember."
+
+## Works With Your AI Coding Workflow
+
+WorkState is designed to sit above your AI coding agents rather than replace them.
+
+It is intended to work alongside:
+
+- OpenAI Codex
+- Claude / Claude Code
+- GitHub Copilot
+- Gemini
+- other AI coding agents
+- future AI coding tools
+
+```text
+                 WORKSTATE
+                     |
+          Persistent Context
+                     |
+       +-------------+-------------+
+       v             v             v
+     Codex         Claude       Copilot
+       v             v             v
+     Gemini       Other AI      Future AI
+```
+
+Today, WorkState uses provider-independent local context and copy-assisted handoff. It does not claim native automatic integrations with every provider.
 
 ## How It Works
 
 1. Work normally in VS Code.
 2. Capture important context when something meaningful happens.
-3. WorkState stores the context locally for that workspace.
-4. Come back later.
-5. Continue where you left off.
-6. Generate a handoff when starting a new AI session.
+3. WorkState stores that context locally for the workspace.
+4. Come back later or open a new AI session.
+5. Use Continue Work to reconstruct where you left off.
+6. Use Handoff to review and copy context into another AI chat.
+
+Current cross-AI examples:
+
+```text
+Claude
+  -> WorkState Handoff
+  -> Copy Context
+  -> New Codex Chat
+  -> Paste Context
+  -> Continue
+```
+
+```text
+Codex
+  -> WorkState
+  -> Handoff
+  -> Claude
+  -> Continue
+```
+
+```text
+Copilot
+  -> WorkState
+  -> Handoff
+  -> Gemini
+  -> Continue
+```
+
+This is useful because the important engineering context is stored outside the individual AI conversation.
 
 ## Continue Work
 
-Continue Work reconstructs the current project context from stored WorkState activity and lightweight Git context.
+Continue Work reconstructs the most relevant stored engineering context for the current workspace.
 
-It is designed to answer:
+It can surface:
 
-- What was I doing?
-- What did I finish?
-- What did I decide?
-- What should I not repeat?
-- What was I about to do?
+- what you were working on
+- recent progress
+- important decisions
+- things not to repeat
+- next steps
+- relevant files
+- Git context where available
+
+Continue Work is the primary WorkState experience.
 
 ## Capture
 
-Capture is the fastest way to save something important.
+Capture is lightweight. It lets you preserve useful engineering context without maintaining a large task form.
 
-Supported capture types:
+Supported capture types include:
 
 - Decision
-- Don't Forget / rejected approach
+- Don't Forget
 - Completed
 - Note
 - Blocker
 - Test Result
 - Next Action
 
-WorkState does not call an AI provider in the current version. The developer chooses the capture type, and that classification becomes trusted local context.
+WorkState is context first, forms second. You should spend time coding, not maintaining WorkState.
 
 ## Handoff
 
-Handoff generates a concise context package for a fresh AI coding session.
-
-Current workflow:
+Handoff creates a compact engineering context package that can be carried into another AI conversation.
 
 ```text
+OLD AI SESSION
+      |
+      v
 WorkState
-  -> Generate context
-  -> Review
-  -> Copy
-  -> New AI chat
-  -> Paste
-  -> Continue
+      |
+      v
+Context Handoff
+      |
+      v
+NEW AI SESSION
 ```
 
-WorkState does not currently inject context directly into Codex, Claude, Copilot, Gemini, or other providers.
+A handoff can include:
+
+- project
+- current focus
+- what happened
+- completed work
+- important decisions
+- things not to repeat
+- recent activity
+- relevant files
+- Git state
+- next step
+
+You can review and copy the generated context before pasting it anywhere.
 
 ## Task DNA
 
-Task DNA is the chronological history of meaningful work events.
+Task DNA is the chronological history of meaningful WorkState activity.
 
-Current Task DNA records:
+It helps answer:
 
-- captures
-- completed work
-- decisions
-- rejected approaches
-- blockers
-- test results
-- handoffs
+- What happened during this piece of work?
+- Why did the work evolve this way?
 
-Future versions may add richer relationships, Git links, search, and visual evolution.
+Current Task DNA is chronological. Advanced graph visualization is not implemented in the current release.
+
+## Persistent Workspace Context
+
+WorkState keeps context locally and associates it with the workspace or project.
+
+```text
+JourneySync
+  -> JourneySync WorkState context
+
+AquaFlow
+  -> AquaFlow WorkState context
+
+Another project
+  -> separate WorkState context
+```
+
+Contexts are workspace-specific and should not be mixed between projects.
+
+## Git Awareness
+
+Where Git is available, WorkState can use lightweight local Git information such as:
+
+- current branch
+- changed files
+- recent commits
+- working tree state
+
+WorkState does not replace Git. It uses Git as one local signal for reconstructing useful engineering context.
 
 ## Notifications
 
-WorkState includes quiet VS Code-native notifications for useful moments such as:
+WorkState can use conservative VS Code-native notifications to surface useful context.
 
-- meaningful previous context restored on workspace reopen
-- a meaningful batch of files changed
-- Git branch context changed
-- handoff context is ready
+Examples:
 
-Notifications are configurable and deduplicated. They are designed to be infrequent, actionable, and dismissible.
+- Welcome Back: "You were working on..."
+- Meaningful Progress: "Looks like you've made meaningful progress."
+- Branch / Context Change: "Your project context changed."
+- Handoff Ready: "Your WorkState context is ready."
 
-## Privacy
+Notifications are designed to be infrequent, actionable, dismissible, and non-blocking. The current implementation uses local heuristics, not AI-powered notification intelligence.
 
-WorkState is local-first:
+## Privacy / Local-First
 
-- no WorkState account required
-- no backend required
+WorkState is designed around a local-first architecture:
+
+- no required WorkState account
+- no required WorkState cloud
+- no required backend
 - no required AI API key
 - no mandatory telemetry
-- no source-code upload
-- project context stays local unless you explicitly copy or share it
+- workspace context is stored locally
+- `.workstate` data is not included in the extension package
+- sensitive paths are excluded from relevant-file discovery according to WorkState privacy rules
+- Git information is read locally
 
-Workspace state is stored in `.workstate/workstate.json` inside the open workspace. Different workspaces keep separate context.
+Project context stays local unless you explicitly copy or share it.
 
-Common sensitive files such as `.env`, credentials, token files, private keys, and secret-looking paths are excluded from relevant-file handling by default.
+## AI Is Optional
 
-## AI
+WorkState's core functionality does not require:
 
-AI is optional.
+- OpenAI API keys
+- Anthropic API keys
+- Gemini API keys
+- Copilot subscription
+- WorkState account
+- WorkState cloud
+- external database
 
-Current WorkState works without OpenAI, Anthropic, Gemini, Copilot, paid APIs, cloud sync, or a WorkState account.
+Future AI-assisted capabilities may include context extraction, summarization, suggested memories, suggested decisions, automatic progress understanding, confidence scoring, Review Center, and richer context reconstruction. These are future capabilities unless explicitly shipped in a release.
 
-Planned AI-assisted capabilities may include:
+## Current Capabilities
 
-- context extraction
-- summarization
-- suggested decisions
-- suggested completed work
-- suggested handoffs
-- context compression
-- Review Center
-
-These are not required for the current local workflow.
-
-## Supported AI Agents
-
-WorkState can be used with AI coding agents that accept pasted context, including Codex, Claude, Copilot, Gemini, and others.
-
-Current support is copy-assisted handoff. Native provider injection is not implemented unless a future provider offers a supported API.
+- context-first WorkState sidebar
+- Continue Work
+- lightweight Capture
+- Decisions and Don't Repeat context
+- copy-assisted Handoff
+- editable Handoff preview
+- Task DNA chronological history
+- workspace-specific local persistence
+- corrupted-state recovery
+- basic Git awareness
+- privacy exclusions for sensitive-looking paths
+- quiet configurable VS Code notifications
+- Command Palette commands
+- Quick Capture keyboard shortcut
+- About WorkState / creator information
 
 ## Current Limitations
 
 - copy-assisted handoff only
-- no automatic provider injection
-- no automatic AI extraction
+- no automatic provider conversation import
+- no automatic context injection into Codex, Claude, Copilot, Gemini, or other providers
+- no automatic AI extraction or summarization
 - no Review Center yet
 - no cloud sync
 - no team collaboration
@@ -165,25 +306,27 @@ Current support is copy-assisted handoff. Native provider injection is not imple
 - no Task DNA graph
 - no Agent Passport
 
+WorkState does not automatically read every Codex, Claude, Copilot, or Gemini conversation. Deeper provider integrations will be added only where supported APIs make them reliable and appropriate.
+
 ## Roadmap
 
 ### Current
 
-- persistent local workspace context
+- persistent local context
 - Continue Work
 - Capture
 - Handoff
 - Task DNA
-- basic Git awareness
-- privacy exclusions
-- quiet configurable notifications
+- Git awareness
+- privacy controls
+- quiet notifications
 
 ### Next
 
 - smarter context reconstruction
+- intelligent notification improvements
 - better session awareness
-- improved notification heuristics
-- stronger persistence UX around workspace switching
+- stronger workspace-switching UX
 
 ### Future
 
@@ -196,9 +339,22 @@ Current support is copy-assisted handoff. Native provider injection is not imple
 
 No timelines are promised.
 
+## Installation
+
+Install WorkState from the Visual Studio Code Marketplace when the public release is available, or install a generated VSIX during local testing.
+
+## Getting Started
+
+1. Open a project in VS Code.
+2. Open the WorkState activity bar item.
+3. Capture meaningful context when something important happens.
+4. Use Continue Work when you come back.
+5. Generate a Handoff when starting a new AI chat.
+6. Review, copy, paste, and continue.
+
 ## Creator
 
-WorkState is created by Pranav.
+Created by Pranav.
 
 GitHub: [pranavv1210](https://github.com/pranavv1210)
 
@@ -245,4 +401,3 @@ Run locally:
 ## License
 
 MIT
-

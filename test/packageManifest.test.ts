@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')) as {
   author: { name: string; url: string };
+  description: string;
   icon: string;
+  keywords: string[];
   contributes: {
     commands: Array<{ command: string; title: string }>;
     keybindings: Array<{ command: string; key: string; mac?: string; when?: string }>;
@@ -36,11 +38,13 @@ describe('package manifest', () => {
   });
 
   it('includes creator metadata and notification settings', () => {
+    expect(manifest.description).toBe('Preserve engineering context across AI coding sessions in VS Code.');
     expect(manifest.author).toEqual({
       name: 'Pranav',
       url: 'https://github.com/pranavv1210'
     });
     expect(manifest.icon).toBe('media/workstate.png');
+    expect(manifest.keywords).toEqual(expect.arrayContaining(['ai-coding', 'coding-agents', 'codex', 'claude', 'copilot', 'gemini']));
     expect(manifest.contributes.configuration.properties).toHaveProperty('workstate.notifications.enabled');
     expect(manifest.contributes.configuration.properties).toHaveProperty('workstate.notifications.welcomeBack');
     expect(manifest.contributes.configuration.properties).toHaveProperty('workstate.notifications.significantChanges');

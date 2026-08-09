@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.2
+
+- Repositioned Marketplace and README copy around WorkState as a local-first engineering context layer for AI coding workflows.
+- Clarified current copy-assisted handoff support across Codex, Claude, Copilot, Gemini, and other AI agents without claiming native provider integrations.
+- Added a stronger professional icon representing persistent context moving between sessions.
+- Expanded privacy, AI-optional, current-capabilities, limitations, and roadmap language for public-release clarity.
+
 ## 0.2.1
 
 - Added quiet, configurable VS Code-native notifications for welcome-back context, meaningful save batches, branch changes, and handoff readiness.
