@@ -1,0 +1,17 @@
+.git/**
+.vscode/**
+node_modules/**
+.workstate/**
+src/**
+test/**
+dist/test/**
+dist/**/*.map
+dist/src/ui/createWorkStatePrompt.js
+.eslintrc.cjs
+tsconfig.json
+vitest.config.ts
+*.vsix
+coverage/**
+*.log
+.gitignore
+masterplan.md

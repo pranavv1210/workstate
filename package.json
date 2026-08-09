@@ -1,0 +1,179 @@
+{
+  "name": "workstate",
+  "displayName": "WorkState",
+  "description": "Local-first context memory for developers continuing work across AI coding sessions.",
+  "version": "0.2.1",
+  "author": {
+    "name": "Pranav",
+    "url": "https://github.com/pranavv1210"
+  },
+  "publisher": "workstate",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pranavv1210/workstate.git"
+  },
+  "engines": {
+    "vscode": "^1.92.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "handoff",
+    "context",
+    "local-first",
+    "productivity"
+  ],
+  "activationEvents": [
+    "onView:workstate.sidebar",
+    "onCommand:workstate.createWorkState",
+    "onCommand:workstate.quickUpdate",
+    "onCommand:workstate.quickCapture",
+    "onCommand:workstate.openActiveWorkState",
+    "onCommand:workstate.editWorkState",
+    "onCommand:workstate.createQuickHandoff",
+    "onCommand:workstate.createFullHandoff",
+    "onCommand:workstate.copyHandoff",
+    "onCommand:workstate.viewTaskDna",
+    "onCommand:workstate.archiveWorkState"
+  ],
+  "main": "./dist/src/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "workstate",
+          "title": "WorkState",
+          "icon": "media/workstate.svg"
+        }
+      ]
+    },
+    "views": {
+      "workstate": [
+        {
+          "id": "workstate.sidebar",
+          "name": "WorkState",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "workstate.createWorkState",
+        "title": "WorkState: Start Remembering"
+      },
+      {
+        "command": "workstate.quickUpdate",
+        "title": "WorkState: Quick Update"
+      },
+      {
+        "command": "workstate.quickCapture",
+        "title": "WorkState: Quick Capture"
+      },
+      {
+        "command": "workstate.openActiveWorkState",
+        "title": "WorkState: Open Active WorkState"
+      },
+      {
+        "command": "workstate.editWorkState",
+        "title": "WorkState: Edit WorkState"
+      },
+      {
+        "command": "workstate.createQuickHandoff",
+        "title": "WorkState: Handoff"
+      },
+      {
+        "command": "workstate.createFullHandoff",
+        "title": "WorkState: Full Context"
+      },
+      {
+        "command": "workstate.copyHandoff",
+        "title": "WorkState: Copy Handoff"
+      },
+      {
+        "command": "workstate.viewTaskDna",
+        "title": "WorkState: View Task DNA"
+      },
+      {
+        "command": "workstate.archiveWorkState",
+        "title": "WorkState: Archive WorkState"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "workstate.quickCapture",
+        "key": "ctrl+alt+w",
+        "mac": "cmd+alt+w",
+        "when": "workspaceFolderCount != 0"
+      }
+    ],
+    "configuration": {
+      "title": "WorkState",
+      "properties": {
+        "workstate.exclusions": {
+          "type": "array",
+          "default": [
+            ".env",
+            ".env.*",
+            "**/.env",
+            "**/.env.*",
+            "**/*secret*",
+            "**/*credential*",
+            "**/credentials.json",
+            "**/service-account.json",
+            "**/*token*",
+            "**/secret.txt",
+            "**/token.txt",
+            "**/*.pem",
+            "**/*.key",
+            "**/id_rsa",
+            "**/id_ed25519"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob-like path patterns excluded from WorkState relevant files and handoffs."
+        },
+        "workstate.notifications.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable quiet, contextual WorkState notifications."
+        },
+        "workstate.notifications.welcomeBack": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a welcome-back notification when meaningful previous context is restored."
+        },
+        "workstate.notifications.significantChanges": {
+          "type": "boolean",
+          "default": true,
+          "description": "Suggest capturing progress after a meaningful batch of changed files."
+        },
+        "workstate.notifications.branchChanges": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a contextual notice when the Git branch changes."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "vitest run",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.14",
+    "@types/vscode": "^1.92.0",
+    "@typescript-eslint/eslint-plugin": "^8.25.0",
+    "@typescript-eslint/parser": "^8.25.0",
+    "@vscode/vsce": "^3.2.1",
+    "eslint": "^8.57.1",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.8"
+  }
+}
