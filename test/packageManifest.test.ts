@@ -72,5 +72,12 @@ describe('package manifest', () => {
     expect(manifest.contributes.configuration.properties).toHaveProperty('workstate.notifications.welcomeBack');
     expect(manifest.contributes.configuration.properties).toHaveProperty('workstate.notifications.significantChanges');
     expect(manifest.contributes.configuration.properties).toHaveProperty('workstate.notifications.branchChanges');
+    expect(manifest.contributes.configuration.properties).toHaveProperty('workstate.contextCapture.mode');
+  });
+
+  it('contributes context switching commands without changing Marketplace identity', () => {
+    const commands = manifest.contributes.commands.map((item) => item.command);
+
+    expect(commands).toEqual(expect.arrayContaining(['workstate.continueWork', 'workstate.reviewContext', 'workstate.providerStatus']));
   });
 });

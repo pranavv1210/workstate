@@ -1,4 +1,17 @@
 export type WorkStateStatus = 'active' | 'paused' | 'completed' | 'archived';
+export type ContextConfidence = 'confirmed' | 'suggested' | 'needs_review' | 'rejected';
+export type ContextSource = 'manual' | 'git' | 'workspace' | 'agent-adapter' | 'deterministic-extraction';
+export type ContextMemoryType =
+  | 'completed'
+  | 'currentState'
+  | 'blocker'
+  | 'decision'
+  | 'rejected'
+  | 'testResult'
+  | 'nextAction'
+  | 'note'
+  | 'fileActivity'
+  | 'session';
 
 export interface Decision {
   id: string;
@@ -27,10 +40,15 @@ export interface TaskDnaEvent {
     | 'test'
     | 'note'
     | 'handoff'
+    | 'session'
+    | 'context'
+    | 'review'
     | 'archived';
   title: string;
   detail?: string;
   timestamp: string;
+  confidence?: ContextConfidence;
+  source?: ContextSource;
 }
 
 export interface GitContext {
@@ -56,10 +74,65 @@ export interface WorkState {
   updatedAt: string;
   status: WorkStateStatus;
   dna: TaskDnaEvent[];
+  memories?: ContextMemory[];
+  reviewItems?: ReviewItem[];
+  sessions?: AgentSession[];
+  contextLayers?: ContextLayers;
   latestHandoff?: {
     mode: HandoffMode;
     content: string;
     createdAt: string;
+  };
+}
+
+export interface ContextMemory {
+  id: string;
+  type: ContextMemoryType;
+  content: string;
+  reason?: string;
+  confidence: ContextConfidence;
+  source: ContextSource;
+  timestamp: string;
+  agentId?: string;
+  evidence?: string;
+}
+
+export interface ReviewItem {
+  id: string;
+  type: ContextMemoryType;
+  content: string;
+  reason?: string;
+  confidence: Extract<ContextConfidence, 'suggested' | 'needs_review'>;
+  source: ContextSource;
+  timestamp: string;
+  evidence?: string;
+  status: 'pending' | 'confirmed' | 'rejected';
+}
+
+export interface AgentSession {
+  id: string;
+  providerId: string;
+  displayName: string;
+  startedAt: string;
+  lastSeenAt: string;
+  status: 'active' | 'ended' | 'unknown';
+}
+
+export interface ContextLayers {
+  project: {
+    decisions: string[];
+    rejectedApproaches: string[];
+    constraints: string[];
+    patterns: string[];
+  };
+  session: {
+    focus?: string;
+    objective?: string;
+    currentState?: string;
+    currentAgent?: string;
+    previousAgent?: string;
+    nextAction?: string;
+    recentFiles: string[];
   };
 }
 
@@ -130,7 +203,11 @@ export function createWorkState(input: WorkStateInput): WorkState {
         detail: input.goal.trim(),
         timestamp
       }
-    ]
+    ],
+    memories: [],
+    reviewItems: [],
+    sessions: [],
+    contextLayers: emptyContextLayers()
   };
 
   if (state.currentState) {
@@ -158,6 +235,20 @@ export function createWorkState(input: WorkStateInput): WorkState {
 
 export function emptyStore(): WorkStateStore {
   return { version: 1, states: [] };
+}
+
+export function emptyContextLayers(): ContextLayers {
+  return {
+    project: {
+      decisions: [],
+      rejectedApproaches: [],
+      constraints: [],
+      patterns: []
+    },
+    session: {
+      recentFiles: []
+    }
+  };
 }
 
 export function getActive(store: WorkStateStore): WorkState | undefined {
@@ -200,6 +291,34 @@ function validateWorkState(value: unknown): WorkState {
     relevantFiles: Array.isArray(state.relevantFiles) ? state.relevantFiles : [],
     testNotes: state.testNotes ?? '',
     nextAction: state.nextAction ?? '',
-    dna: Array.isArray(state.dna) ? state.dna : []
+    dna: Array.isArray(state.dna) ? state.dna : [],
+    memories: Array.isArray(state.memories) ? state.memories : [],
+    reviewItems: Array.isArray(state.reviewItems) ? state.reviewItems : [],
+    sessions: Array.isArray(state.sessions) ? state.sessions : [],
+    contextLayers: validateContextLayers(state.contextLayers)
+  };
+}
+
+function validateContextLayers(value: unknown): ContextLayers {
+  if (!value || typeof value !== 'object') {
+    return emptyContextLayers();
+  }
+  const layers = value as Partial<ContextLayers>;
+  return {
+    project: {
+      decisions: Array.isArray(layers.project?.decisions) ? layers.project.decisions : [],
+      rejectedApproaches: Array.isArray(layers.project?.rejectedApproaches) ? layers.project.rejectedApproaches : [],
+      constraints: Array.isArray(layers.project?.constraints) ? layers.project.constraints : [],
+      patterns: Array.isArray(layers.project?.patterns) ? layers.project.patterns : []
+    },
+    session: {
+      focus: typeof layers.session?.focus === 'string' ? layers.session.focus : undefined,
+      objective: typeof layers.session?.objective === 'string' ? layers.session.objective : undefined,
+      currentState: typeof layers.session?.currentState === 'string' ? layers.session.currentState : undefined,
+      currentAgent: typeof layers.session?.currentAgent === 'string' ? layers.session.currentAgent : undefined,
+      previousAgent: typeof layers.session?.previousAgent === 'string' ? layers.session.previousAgent : undefined,
+      nextAction: typeof layers.session?.nextAction === 'string' ? layers.session.nextAction : undefined,
+      recentFiles: Array.isArray(layers.session?.recentFiles) ? layers.session.recentFiles : []
+    }
   };
 }

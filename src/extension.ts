@@ -1,5 +1,8 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { AgentRegistry } from './agents/agentRegistry';
+import { extractContextMemories } from './context/contextExtractor';
+import { confirmReviewItem, mergeContextMemories, recordFileActivity, rejectReviewItem } from './context/contextMerger';
 import { ensureWorkspaceContext, generateContinuationContext, summarizeContext } from './domain/context';
 import { generateHandoff } from './domain/handoff';
 import {
@@ -36,8 +39,17 @@ import {
 } from './domain/mutations';
 import { filterExcludedPaths, getDefaultExclusions, isExcludedPath } from './domain/privacy';
 import { getGitContext } from './git/gitContext';
+import { recordAgentSession } from './sessions/sessionEvents';
 import { WorkStateRepository } from './storage/workStateRepository';
-import { editWorkStateHtml, handoffHtml, quickUpdateHtml, sidebarHtml, taskDnaHtml } from './ui/html';
+import {
+  editWorkStateHtml,
+  handoffHtml,
+  providerStatusHtml,
+  quickUpdateHtml,
+  reviewContextHtml,
+  sidebarHtml,
+  taskDnaHtml
+} from './ui/html';
 
 let controller: WorkStateController | undefined;
 
@@ -53,6 +65,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('workstate.createQuickHandoff', () => controller?.createHandoff('quick')),
     vscode.commands.registerCommand('workstate.createFullHandoff', () => controller?.createHandoff('full')),
     vscode.commands.registerCommand('workstate.copyHandoff', () => controller?.copyLatestHandoff()),
+    vscode.commands.registerCommand('workstate.continueWork', () => controller?.continueWork()),
+    vscode.commands.registerCommand('workstate.reviewContext', () => controller?.reviewContext()),
+    vscode.commands.registerCommand('workstate.providerStatus', () => controller?.providerStatus()),
     vscode.commands.registerCommand('workstate.viewTaskDna', () => controller?.viewTaskDna()),
     vscode.commands.registerCommand('workstate.archiveWorkState', () => controller?.archiveActive()),
     vscode.workspace.onDidSaveTextDocument((document) => controller?.onDocumentSaved(document)),
@@ -68,6 +83,7 @@ class WorkStateController implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private readonly repository?: WorkStateRepository;
   private store: WorkStateStore = { version: 1, states: [] };
+  private readonly agents = new AgentRegistry();
   private restorationDismissed = false;
   private loadError?: string;
   private readonly notificationKey = 'workstate.notifications.memory';
@@ -144,6 +160,68 @@ class WorkStateController implements vscode.WebviewViewProvider {
     await this.copyToClipboard(content);
   }
 
+  async continueWork(): Promise<void> {
+    const active = await this.ensureContext();
+    if (!active) {
+      return;
+    }
+    const pick = await vscode.window.showQuickPick(
+      this.agents.capabilities().map((provider) => ({
+        label: provider.displayName,
+        description: provider.fallbackLabel,
+        detail: provider.notes,
+        providerId: provider.providerId
+      })),
+      {
+        title: 'Continue Work',
+        placeHolder: 'Choose where to continue. Unsupported direct injection uses copy-assisted handoff.'
+      }
+    );
+    if (!pick) {
+      return;
+    }
+    this.replaceState(recordAgentSession(active, pick.providerId, pick.label));
+    const current = getActive(this.store) ?? active;
+    const content = await this.buildContextHandoff(current, 'quick');
+    this.replaceState(recordHandoff(current, 'quick', content));
+    await this.persist();
+    await this.copyToClipboard(content, `Context prepared for ${pick.label}. Paste it into the new AI session to continue.`);
+  }
+
+  async reviewContext(): Promise<void> {
+    const active = this.activeOrNotify();
+    if (!active) {
+      return;
+    }
+    const panel = vscode.window.createWebviewPanel('workstate.reviewContext', 'Review Context', vscode.ViewColumn.Active, {
+      enableScripts: true
+    });
+    panel.webview.html = reviewContextHtml(nonce(), active);
+    panel.webview.onDidReceiveMessage(async (message) => {
+      const current = getActive(this.store);
+      if (!current) {
+        return;
+      }
+      if (message.type === 'confirmReview') {
+        this.replaceState(confirmReviewItem(current, String(message.id ?? '')));
+        await this.persist();
+        panel.webview.html = reviewContextHtml(nonce(), getActive(this.store) ?? current);
+      }
+      if (message.type === 'rejectReview') {
+        this.replaceState(rejectReviewItem(current, String(message.id ?? '')));
+        await this.persist();
+        panel.webview.html = reviewContextHtml(nonce(), getActive(this.store) ?? current);
+      }
+    });
+  }
+
+  async providerStatus(): Promise<void> {
+    const panel = vscode.window.createWebviewPanel('workstate.providerStatus', 'AI Provider Status', vscode.ViewColumn.Active, {
+      enableScripts: false
+    });
+    panel.webview.html = providerStatusHtml(nonce(), this.agents.capabilities());
+  }
+
   async viewTaskDna(): Promise<void> {
     const active = this.activeOrNotify();
     if (!active) {
@@ -167,6 +245,11 @@ class WorkStateController implements vscode.WebviewViewProvider {
     let memory = this.notificationMemory();
     memory = trackChangedFile(memory, relative);
     await this.setNotificationMemory(memory);
+    const active = getActive(this.store);
+    if (active) {
+      this.replaceState(recordFileActivity(active, relative));
+      await this.persist();
+    }
     if (shouldSuggestCaptureProgress(this.notificationSettings(), memory)) {
       memory = rememberCaptureProgressSuggestion(memory);
       await this.setNotificationMemory(memory);
@@ -264,6 +347,7 @@ class WorkStateController implements vscode.WebviewViewProvider {
     this.view?.webview.postMessage({
       active,
       summary: summarizeContext(active, this.projectName()),
+      providers: this.agents.capabilities(),
       restoration: Boolean(active?.latestHandoff && !this.restorationDismissed),
       error: this.loadError
     });
@@ -441,7 +525,11 @@ class WorkStateController implements vscode.WebviewViewProvider {
         return;
       }
       try {
-        this.replaceState(applyQuickUpdate(active, input));
+        let next = applyQuickUpdate(active, input);
+        if ((input.type === 'note' || input.type === 'currentState') && this.contextCaptureMode() !== 'manual') {
+          next = mergeContextMemories(next, extractContextMemories(input.content, { source: 'deterministic-extraction' }));
+        }
+        this.replaceState(next);
         await this.save(quickUpdateMessage(input.type));
         panel.dispose();
       } catch (error) {
@@ -450,10 +538,10 @@ class WorkStateController implements vscode.WebviewViewProvider {
     });
   }
 
-  private async copyToClipboard(content: string): Promise<void> {
+  private async copyToClipboard(content: string, successMessage = 'Handoff copied to clipboard.'): Promise<void> {
     try {
       await vscode.env.clipboard.writeText(content);
-      vscode.window.showInformationMessage('Handoff copied to clipboard.');
+      vscode.window.showInformationMessage(successMessage);
     } catch (error) {
       vscode.window.showErrorMessage(`Could not copy handoff: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -468,7 +556,7 @@ class WorkStateController implements vscode.WebviewViewProvider {
         await this.create();
         break;
       case 'continue':
-        await this.createHandoff('quick');
+        await this.continueWork();
         break;
       case 'edit':
         await this.editActive();
@@ -481,6 +569,12 @@ class WorkStateController implements vscode.WebviewViewProvider {
         break;
       case 'handoff':
         await this.createHandoff(message.mode === 'full' ? 'full' : 'quick');
+        break;
+      case 'providers':
+        await this.providerStatus();
+        break;
+      case 'review':
+        await this.reviewContext();
         break;
       case 'decision':
         await this.manageDecisions();
@@ -542,6 +636,11 @@ class WorkStateController implements vscode.WebviewViewProvider {
       significantChanges: config.get<boolean>('significantChanges', true),
       branchChanges: config.get<boolean>('branchChanges', true)
     };
+  }
+
+  private contextCaptureMode(): 'automatic' | 'askWhenUncertain' | 'manual' {
+    const configured = vscode.workspace.getConfiguration('workstate.contextCapture').get<string>('mode', 'automatic');
+    return configured === 'askWhenUncertain' || configured === 'manual' ? configured : 'automatic';
   }
 
   private notificationMemory(): NotificationMemory {

@@ -86,6 +86,8 @@ export function generateContinuationContext(summary: ContextSummary, state: Work
   const completed = state?.completed.slice(-5) ?? [];
   const blockers = state?.blockers.slice(-3) ?? [];
   const rejected = state?.rejectedApproaches.slice(-3) ?? [];
+  const pendingReview = (state?.reviewItems ?? []).filter((item) => item.status === 'pending').slice(-3);
+  const lastSession = state?.sessions?.at(-1);
   const lines = [
     'WORKSTATE CONTEXT',
     '',
@@ -117,6 +119,12 @@ export function generateContinuationContext(summary: ContextSummary, state: Work
     '',
     'Git state:',
     git?.unavailableReason ? `Unavailable: ${git.unavailableReason}` : gitSummary(git),
+    '',
+    'AI session context:',
+    lastSession ? `Last target agent: ${lastSession.displayName}\nHandoff mode: copy-assisted unless provider status says otherwise.` : 'No target agent recorded yet.',
+    '',
+    'Suggested context needing review:',
+    listOrNone(pendingReview.map((item) => `${item.type}: ${item.content}`)),
     '',
     'Next:',
     summary.next,
@@ -223,4 +231,3 @@ function gitSummary(git?: GitContext): string {
   const parts = [git.branch ? `Branch: ${git.branch}` : undefined, git.changedFiles.length ? `Changed files: ${git.changedFiles.join(', ')}` : 'Working tree clean or not captured.'].filter(Boolean);
   return parts.join('\n');
 }
-

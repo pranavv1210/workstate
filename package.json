@@ -43,6 +43,9 @@
     "onCommand:workstate.createQuickHandoff",
     "onCommand:workstate.createFullHandoff",
     "onCommand:workstate.copyHandoff",
+    "onCommand:workstate.continueWork",
+    "onCommand:workstate.reviewContext",
+    "onCommand:workstate.providerStatus",
     "onCommand:workstate.viewTaskDna",
     "onCommand:workstate.archiveWorkState"
   ],
@@ -98,6 +101,18 @@
       {
         "command": "workstate.copyHandoff",
         "title": "WorkState: Copy Handoff"
+      },
+      {
+        "command": "workstate.continueWork",
+        "title": "WorkState: Continue Work"
+      },
+      {
+        "command": "workstate.reviewContext",
+        "title": "WorkState: Review Context"
+      },
+      {
+        "command": "workstate.providerStatus",
+        "title": "WorkState: AI Provider Status"
       },
       {
         "command": "workstate.viewTaskDna",
@@ -162,6 +177,16 @@
           "type": "boolean",
           "default": true,
           "description": "Show a contextual notice when the Git branch changes."
+        },
+        "workstate.contextCapture.mode": {
+          "type": "string",
+          "enum": [
+            "automatic",
+            "askWhenUncertain",
+            "manual"
+          ],
+          "default": "automatic",
+          "description": "Controls local deterministic context capture. High-confidence context can be saved automatically; uncertain context is held for review."
         }
       }
     }

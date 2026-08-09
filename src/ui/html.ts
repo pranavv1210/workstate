@@ -1,3 +1,4 @@
+import { AgentCapabilities } from '../agents/agentCapabilities';
 import { WorkState } from '../domain/model';
 
 export function sidebarHtml(nonce: string): string {
@@ -6,7 +7,7 @@ export function sidebarHtml(nonce: string): string {
     <script nonce="${nonce}">
       const vscode = acquireVsCodeApi();
       const app = document.getElementById('app');
-      let state = { active: null, summary: null, restoration: false, error: null };
+      let state = { active: null, summary: null, providers: [], restoration: false, error: null };
 
       window.addEventListener('message', event => {
         state = event.data;
@@ -39,6 +40,7 @@ export function sidebarHtml(nonce: string): string {
         }
         const ws = state.active;
         const summary = state.summary || {};
+        const pendingReview = (ws.reviewItems || []).filter(item => item.status === 'pending').length;
         app.innerHTML = \`
           <section>
             <div class="eyebrow">WORKSTATE</div>
@@ -52,15 +54,22 @@ export function sidebarHtml(nonce: string): string {
               <p>\${escapeHtml(summary.next || 'Continue from the most recent captured context.')}</p>
             </div>
             <button id="continue" class="primary">Continue Work</button>
+            <div class="provider-row">\${providerButtons(state.providers || [])}</div>
             <div class="grid-actions">
               <button id="quickCapture" class="secondary">Capture</button>
               <button id="decision" class="secondary">Decisions</button>
               <button id="handoff" class="secondary">Handoff</button>
             </div>
+            \${pendingReview ? '<button id="review" class="secondary wide">Review Context (' + pendingReview + ')</button>' : ''}
             <section class="recent">
               <div class="label">Recent</div>
               \${list(summary.recent || [])}
             </section>
+            <details>
+              <summary>Context Switching</summary>
+              <p class="muted">Work normally. WorkState preserves useful local context. Start or switch AI sessions, then Continue Work. Direct provider injection is used only when a stable API exists; otherwise WorkState prepares copy-assisted context.</p>
+              <button id="providers" class="secondary">AI Provider Status</button>
+            </details>
             <details>
               <summary>Details</summary>
               <div class="actions">
@@ -96,6 +105,8 @@ export function sidebarHtml(nonce: string): string {
         bind('edit', () => post('edit'));
         bind('decision', () => post('decision'));
         bind('rejected', () => post('rejected'));
+        bind('review', () => post('review'));
+        bind('providers', () => post('providers'));
         bind('files', () => post('files'));
         bind('aboutGithub', () => post('aboutGithub'));
         bind('dna', () => post('dna'));
@@ -106,6 +117,10 @@ export function sidebarHtml(nonce: string): string {
       function bind(id, handler) {
         const element = document.getElementById(id);
         if (element) element.onclick = handler;
+      }
+      function providerButtons(providers) {
+        if (!providers.length) return '';
+        return providers.slice(0, 4).map(provider => '<span title="' + escapeHtml(provider.notes || '') + '">' + escapeHtml(provider.displayName) + ': ' + escapeHtml(provider.fallbackLabel || 'Copy-assisted') + '</span>').join('');
       }
       post('ready');
     </script>
@@ -191,6 +206,62 @@ export function quickUpdateHtml(nonce: string, variant: 'update' | 'capture'): s
       });
       sync();
       document.getElementById('content').focus();
+    </script>
+  `);
+}
+
+export function providerStatusHtml(nonce: string, providers: AgentCapabilities[]): string {
+  const rows = providers
+    .map(
+      (provider) => `<tr>
+        <td>${escapeHtml(provider.displayName)}</td>
+        <td>${escapeHtml(provider.sessionObservable)}</td>
+        <td>${escapeHtml(provider.conversationAccessible)}</td>
+        <td>${escapeHtml(provider.canProvideContext)}</td>
+        <td>${escapeHtml(provider.canInjectContext)}</td>
+        <td>${escapeHtml(provider.fallbackLabel)}</td>
+      </tr>`
+    )
+    .join('');
+  return htmlDocument(nonce, `
+    <main class="wrap">
+      <h2>AI Provider Status</h2>
+      <p class="muted">WorkState uses stable, provider-independent context. Direct provider injection is only shown as supported when a stable API exists.</p>
+      <table>
+        <thead><tr><th>Provider</th><th>Sessions</th><th>Conversation</th><th>Context</th><th>Injection</th><th>Fallback</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </main>
+  `);
+}
+
+export function reviewContextHtml(nonce: string, state: WorkState): string {
+  const pending = (state.reviewItems ?? []).filter((item) => item.status === 'pending');
+  const items = pending
+    .map(
+      (item) => `<li>
+        <div class="label">${escapeHtml(item.type)} - ${escapeHtml(item.confidence)}</div>
+        <strong>${escapeHtml(item.content)}</strong>
+        ${item.evidence ? `<p class="muted">${escapeHtml(item.evidence)}</p>` : ''}
+        <button data-confirm="${escapeAttribute(item.id)}">Confirm</button>
+        <button class="secondary" data-reject="${escapeAttribute(item.id)}">Reject</button>
+      </li>`
+    )
+    .join('');
+  return htmlDocument(nonce, `
+    <main class="wrap">
+      <h2>Review Context</h2>
+      <p class="muted">Suggested context is not treated as confirmed until you approve it.</p>
+      <ol class="timeline">${items || '<li>No suggested context waiting for review.</li>'}</ol>
+    </main>
+    <script nonce="${nonce}">
+      const vscode = acquireVsCodeApi();
+      document.querySelectorAll('button[data-confirm]').forEach(button => {
+        button.onclick = () => vscode.postMessage({ type: 'confirmReview', id: button.dataset.confirm });
+      });
+      document.querySelectorAll('button[data-reject]').forEach(button => {
+        button.onclick = () => vscode.postMessage({ type: 'rejectReview', id: button.dataset.reject });
+      });
     </script>
   `);
 }
@@ -288,6 +359,9 @@ function htmlDocument(nonce: string, body: string): string {
     button.primary { width: 100%; padding: 9px; margin: 8px 0; font-weight: 600; }
     .actions { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
     .grid-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; margin: 8px 0 12px; }
+    .provider-row { display: grid; gap: 4px; margin: 0 0 10px; }
+    .provider-row span { color: var(--vscode-descriptionForeground); font-size: 11px; border: 1px solid var(--vscode-sideBarSectionHeader-border); padding: 4px 6px; border-radius: 3px; }
+    button.wide { width: 100%; margin-bottom: 8px; }
     .capture-menu { display: grid; grid-template-columns: 1fr; gap: 7px; padding: 8px 0; }
     .footer { display: flex; justify-content: space-between; border-top: 1px solid var(--vscode-sideBarSectionHeader-border); margin-top: 12px; padding-top: 10px; }
     .muted { color: var(--vscode-descriptionForeground); }
@@ -315,6 +389,8 @@ function htmlDocument(nonce: string, body: string): string {
     .timeline strong { display: block; margin-top: 3px; }
     .timeline p { margin: 4px 0 0; color: var(--vscode-descriptionForeground); }
     .hidden { display: none; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border); text-align: left; padding: 6px; vertical-align: top; }
   </style>
 </head>
 <body>${body}</body>
