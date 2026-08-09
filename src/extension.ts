@@ -1,6 +1,9 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { AgentRegistry } from './agents/agentRegistry';
+import { registerWorkStateLanguageModelTools, WorkStateAiBridge } from './ai/languageModelTools';
+import { registerWorkStateChatParticipant } from './ai/workstateChatParticipant';
+import { WorkStateToolScope, WorkStateToolService, WorkStateUpdateContextInput, WorkStateSaveDecisionInput } from './ai/workstateToolService';
 import { extractContextMemories } from './context/contextExtractor';
 import { confirmReviewItem, mergeContextMemories, recordFileActivity, rejectReviewItem } from './context/contextMerger';
 import { createWorkspaceSnapshot, reconcileWorkspaceState } from './context/reconciliation';
@@ -56,6 +59,8 @@ let controller: WorkStateController | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
   controller = new WorkStateController(context);
+  registerWorkStateLanguageModelTools(context, controller);
+  registerWorkStateChatParticipant(context, controller);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('workstate.sidebar', controller),
     vscode.commands.registerCommand('workstate.createWorkState', () => controller?.create()),
@@ -80,11 +85,12 @@ export function deactivate(): void {
   controller = undefined;
 }
 
-class WorkStateController implements vscode.WebviewViewProvider {
+class WorkStateController implements vscode.WebviewViewProvider, WorkStateAiBridge {
   private view?: vscode.WebviewView;
   private readonly repository?: WorkStateRepository;
   private store: WorkStateStore = { version: 1, states: [] };
   private readonly agents = new AgentRegistry();
+  private readonly toolService = new WorkStateToolService();
   private restorationDismissed = false;
   private loadError?: string;
   private readonly notificationKey = 'workstate.notifications.memory';
@@ -305,6 +311,45 @@ class WorkStateController implements vscode.WebviewViewProvider {
     await this.save('WorkState archived.');
   }
 
+  async getToolContext(scope?: WorkStateToolScope): Promise<string> {
+    const context = await this.toolContext();
+    return this.toolService.getContext(context, scope);
+  }
+
+  async getToolResumeState(): Promise<string> {
+    await this.toolContext();
+    await this.reconcileActiveContext();
+    return this.toolService.getResumeState(await this.toolContext());
+  }
+
+  async updateToolContext(input: WorkStateUpdateContextInput): Promise<string> {
+    const result = this.toolService.updateContext(await this.toolContext(), input);
+    this.replaceState(result.state);
+    await this.persist();
+    return result.message;
+  }
+
+  async saveToolDecision(input: WorkStateSaveDecisionInput): Promise<string> {
+    const result = this.toolService.saveDecision(await this.toolContext(), input);
+    this.replaceState(result.state);
+    await this.persist();
+    return result.message;
+  }
+
+  async reconcileToolContext(): Promise<string> {
+    const result = this.toolService.reconcile(await this.toolContext());
+    this.replaceState(result.state);
+    await this.persist();
+    return result.message;
+  }
+
+  async getToolHandoff(targetAgent?: string): Promise<string> {
+    const result = this.toolService.getHandoff(await this.toolContext(), targetAgent);
+    this.replaceState(result.state);
+    await this.persist();
+    return result.message;
+  }
+
   private async load(): Promise<void> {
     if (!this.repository) {
       return;
@@ -343,6 +388,21 @@ class WorkStateController implements vscode.WebviewViewProvider {
     const snapshot = createWorkspaceSnapshot(this.projectName(), git);
     this.replaceState(reconcileWorkspaceState(active, snapshot));
     await this.persist();
+  }
+
+  private async toolContext() {
+    const active = await this.ensureContext();
+    if (!active) {
+      throw new Error('Open a workspace before asking WorkState for context.');
+    }
+    const root = this.workspaceRoot();
+    const git = root ? await getGitContext(root, this.exclusions()) : undefined;
+    return {
+      state: getActive(this.store) ?? active,
+      projectName: this.projectName(),
+      git,
+      exclusions: this.exclusions()
+    };
   }
 
   private async save(message: string): Promise<void> {
@@ -439,9 +499,9 @@ class WorkStateController implements vscode.WebviewViewProvider {
     const git = root ? await getGitContext(root, this.exclusions()) : undefined;
     const summary = summarizeContext(state, this.projectName(), git, this.exclusions());
     if (mode === 'full') {
-      return generateContinuationContext(summary, state, git);
+      return generateContinuationContext(summary, state, git, this.exclusions());
     }
-    return generateContinuationContext(summary, state, git);
+    return generateContinuationContext(summary, state, git, this.exclusions());
   }
 
   private showHandoffPanel(mode: HandoffMode, content: string): void {

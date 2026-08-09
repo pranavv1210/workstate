@@ -19,8 +19,11 @@ const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.
     };
     commands: Array<{ command: string; title: string }>;
     keybindings: Array<{ command: string; key: string; mac?: string; when?: string }>;
+    chatParticipants: Array<{ id: string; name: string; fullName: string; commands: Array<{ name: string; description: string }> }>;
+    languageModelTools: Array<{ name: string; canBeReferencedInPrompt: boolean; when: string; inputSchema: unknown }>;
     configuration: { properties: Record<string, unknown> };
   };
+  activationEvents: string[];
 };
 
 describe('package manifest', () => {
@@ -79,5 +82,44 @@ describe('package manifest', () => {
     const commands = manifest.contributes.commands.map((item) => item.command);
 
     expect(commands).toEqual(expect.arrayContaining(['workstate.continueWork', 'workstate.reviewContext', 'workstate.providerStatus']));
+  });
+
+  it('contributes WorkState AI tools and chat participant through stable VS Code extension points', () => {
+    const toolNames = manifest.contributes.languageModelTools.map((tool) => tool.name);
+
+    expect(toolNames).toEqual([
+      'workstate_get_context',
+      'workstate_get_resume_state',
+      'workstate_update_context',
+      'workstate_save_decision',
+      'workstate_reconcile',
+      'workstate_get_handoff'
+    ]);
+    expect(manifest.contributes.languageModelTools.every((tool) => tool.canBeReferencedInPrompt)).toBe(true);
+    expect(manifest.contributes.languageModelTools.every((tool) => tool.when === 'workspaceFolderCount != 0')).toBe(true);
+    expect(manifest.contributes.chatParticipants).toEqual([
+      expect.objectContaining({
+        id: 'workstate.chat',
+        name: 'workstate',
+        fullName: 'WorkState'
+      })
+    ]);
+    expect(manifest.contributes.chatParticipants[0]?.commands.map((command) => command.name)).toEqual([
+      'resume',
+      'handoff',
+      'reconcile',
+      'decision'
+    ]);
+    expect(manifest.activationEvents).toEqual(
+      expect.arrayContaining([
+        'onChatParticipant:workstate.chat',
+        'onLanguageModelTool:workstate_get_context',
+        'onLanguageModelTool:workstate_get_resume_state',
+        'onLanguageModelTool:workstate_update_context',
+        'onLanguageModelTool:workstate_save_decision',
+        'onLanguageModelTool:workstate_reconcile',
+        'onLanguageModelTool:workstate_get_handoff'
+      ])
+    );
   });
 });

@@ -82,7 +82,7 @@ export function summarizeContext(state: WorkState | undefined, projectName: stri
   };
 }
 
-export function generateContinuationContext(summary: ContextSummary, state: WorkState | undefined, git?: GitContext): string {
+export function generateContinuationContext(summary: ContextSummary, state: WorkState | undefined, git?: GitContext, exclusions?: string[]): string {
   const completed = state?.completed.slice(-5) ?? [];
   const blockers = state?.blockers.slice(-3) ?? [];
   const rejected = state?.rejectedApproaches.slice(-3) ?? [];
@@ -120,7 +120,7 @@ export function generateContinuationContext(summary: ContextSummary, state: Work
     listOrNone(summary.relevantFiles),
     '',
     'Git state:',
-    git?.unavailableReason ? `Unavailable: ${git.unavailableReason}` : gitSummary(git),
+    git?.unavailableReason ? `Unavailable: ${git.unavailableReason}` : gitSummary(git, exclusions),
     '',
     'AI session context:',
     lastSession ? `Last target agent: ${lastSession.displayName}\nHandoff mode: copy-assisted unless provider status says otherwise.` : 'No target agent recorded yet.',
@@ -232,10 +232,11 @@ function listOrNone(items: string[]): string {
   return items.length ? items.map((item) => `- ${item}`).join('\n') : 'None captured yet.';
 }
 
-function gitSummary(git?: GitContext): string {
+function gitSummary(git?: GitContext, exclusions?: string[]): string {
   if (!git) {
     return 'Unavailable.';
   }
-  const parts = [git.branch ? `Branch: ${git.branch}` : undefined, git.changedFiles.length ? `Changed files: ${git.changedFiles.join(', ')}` : 'Working tree clean or not captured.'].filter(Boolean);
+  const changedFiles = filterExcludedPaths(git.changedFiles, exclusions);
+  const parts = [git.branch ? `Branch: ${git.branch}` : undefined, changedFiles.length ? `Changed files: ${changedFiles.join(', ')}` : 'Working tree clean or not captured.'].filter(Boolean);
   return parts.join('\n');
 }

@@ -47,7 +47,14 @@
     "onCommand:workstate.reviewContext",
     "onCommand:workstate.providerStatus",
     "onCommand:workstate.viewTaskDna",
-    "onCommand:workstate.archiveWorkState"
+    "onCommand:workstate.archiveWorkState",
+    "onChatParticipant:workstate.chat",
+    "onLanguageModelTool:workstate_get_context",
+    "onLanguageModelTool:workstate_get_resume_state",
+    "onLanguageModelTool:workstate_update_context",
+    "onLanguageModelTool:workstate_save_decision",
+    "onLanguageModelTool:workstate_reconcile",
+    "onLanguageModelTool:workstate_get_handoff"
   ],
   "main": "./dist/src/extension.js",
   "contributes": {
@@ -129,6 +136,220 @@
         "key": "ctrl+alt+w",
         "mac": "cmd+alt+w",
         "when": "workspaceFolderCount != 0"
+      }
+    ],
+    "chatParticipants": [
+      {
+        "id": "workstate.chat",
+        "name": "workstate",
+        "fullName": "WorkState",
+        "description": "Ask WorkState where you left off or prepare context for another AI coding session.",
+        "isSticky": false,
+        "commands": [
+          {
+            "name": "resume",
+            "description": "Show the compact resume state for this workspace."
+          },
+          {
+            "name": "handoff",
+            "description": "Prepare copy-assisted context for another AI coding agent."
+          },
+          {
+            "name": "reconcile",
+            "description": "Reconcile saved WorkState context with current Git and workspace evidence."
+          },
+          {
+            "name": "decision",
+            "description": "Save a decision to the current workspace WorkState."
+          }
+        ]
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "workstate_get_context",
+        "tags": [
+          "workstate",
+          "context"
+        ],
+        "toolReferenceName": "workstateContext",
+        "displayName": "Get WorkState Context",
+        "modelDescription": "Returns compact, trusted engineering context for the current VS Code workspace from local WorkState state, Git evidence, recent activity, decisions, rejected approaches, blockers, tests, and relevant files. Use this when an AI coding agent needs to understand what the developer was working on. Do not use it to read secrets or raw workspace files.",
+        "userDescription": "Get compact WorkState context for the current workspace.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(debug-continue)",
+        "when": "workspaceFolderCount != 0",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "scope": {
+              "type": "string",
+              "enum": [
+                "current",
+                "recent",
+                "project",
+                "resume"
+              ],
+              "description": "Context scope to retrieve. Use resume when starting or continuing an AI coding session.",
+              "default": "current"
+            }
+          }
+        }
+      },
+      {
+        "name": "workstate_get_resume_state",
+        "tags": [
+          "workstate",
+          "context",
+          "resume"
+        ],
+        "toolReferenceName": "workstateResume",
+        "displayName": "Get WorkState Resume State",
+        "modelDescription": "Returns exactly the compact WorkState context a new AI coding session needs to continue: project, current focus, state, completed work, decisions, rejected approaches, blockers, tests, relevant files, Git state, reconciliation/conflicts, and next action.",
+        "userDescription": "Get the continuation context for this workspace.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(debug-start)",
+        "when": "workspaceFolderCount != 0",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "workstate_update_context",
+        "tags": [
+          "workstate",
+          "context",
+          "write"
+        ],
+        "toolReferenceName": "workstateUpdate",
+        "displayName": "Update WorkState Context",
+        "modelDescription": "Saves a meaningful engineering context update to local WorkState for the current workspace. Use only for developer-relevant progress such as completed work, current state, decisions, rejected approaches, blockers, tests, next actions, or notes. Do not store secrets or raw credentials.",
+        "userDescription": "Save a meaningful context update to WorkState.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(save)",
+        "when": "workspaceFolderCount != 0",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "type",
+            "content"
+          ],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "current_state",
+                "decision",
+                "rejected",
+                "blocker",
+                "test",
+                "next_action",
+                "note"
+              ],
+              "description": "The kind of engineering context being saved."
+            },
+            "content": {
+              "type": "string",
+              "description": "The concise context to save."
+            },
+            "reason": {
+              "type": "string",
+              "description": "Optional reason, especially for decisions and rejected approaches."
+            },
+            "evidence": {
+              "type": "string",
+              "description": "Optional source/evidence for the update."
+            }
+          }
+        }
+      },
+      {
+        "name": "workstate_save_decision",
+        "tags": [
+          "workstate",
+          "decision",
+          "write"
+        ],
+        "toolReferenceName": "workstateDecision",
+        "displayName": "Save WorkState Decision",
+        "modelDescription": "Saves a confirmed engineering decision to local WorkState for the current workspace. Use only when the developer or workspace context clearly establishes a decision.",
+        "userDescription": "Save an engineering decision to WorkState.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(check)",
+        "when": "workspaceFolderCount != 0",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "decision"
+          ],
+          "properties": {
+            "decision": {
+              "type": "string",
+              "description": "The concise decision to save."
+            },
+            "reason": {
+              "type": "string",
+              "description": "Optional reason for the decision."
+            },
+            "evidence": {
+              "type": "string",
+              "description": "Optional source/evidence for the decision."
+            }
+          }
+        }
+      },
+      {
+        "name": "workstate_reconcile",
+        "tags": [
+          "workstate",
+          "context",
+          "git"
+        ],
+        "toolReferenceName": "workstateReconcile",
+        "displayName": "Reconcile WorkState Context",
+        "modelDescription": "Compares persisted WorkState context with current local Git/workspace evidence and returns a concise reconciliation summary. Use before resuming work after interruption, restart, branch change, or time away.",
+        "userDescription": "Reconcile saved context with current workspace evidence.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(sync)",
+        "when": "workspaceFolderCount != 0",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "workstate_get_handoff",
+        "tags": [
+          "workstate",
+          "handoff",
+          "context"
+        ],
+        "toolReferenceName": "workstateHandoff",
+        "displayName": "Get WorkState Handoff",
+        "modelDescription": "Generates a compact provider-independent handoff context for another AI coding agent. It uses the existing provider registry for target formatting and clearly falls back to copy-assisted handoff when direct injection is unavailable.",
+        "userDescription": "Prepare a compact handoff for another AI coding agent.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(arrow-right)",
+        "when": "workspaceFolderCount != 0",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "targetAgent": {
+              "type": "string",
+              "enum": [
+                "Codex",
+                "Claude",
+                "Copilot",
+                "Gemini",
+                "Other"
+              ],
+              "description": "Target AI coding agent for handoff formatting.",
+              "default": "Other"
+            }
+          }
+        }
       }
     ],
     "configuration": {

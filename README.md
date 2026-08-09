@@ -57,6 +57,8 @@ WorkState is provider-independent. It is designed to work alongside:
 
 Current support is copy-assisted handoff where direct provider injection is unavailable.
 
+Inside VS Code, WorkState also contributes stable Language Model Tools and an `@workstate` chat participant so supported agent workflows can retrieve project context directly from WorkState.
+
 ```text
 Codex
   -> WorkState
@@ -69,7 +71,37 @@ Codex
 
 Use **Continue Work** when you are starting a new chat or switching agents. WorkState reconstructs the current workspace context, asks where you want to continue, prepares the relevant context, and copies it for the target agent.
 
-Direct injection is only used when a stable supported provider API exists. In the current release, provider continuation is copy-assisted.
+Direct injection is only used when a stable supported provider API exists. In the current release, provider continuation is agent-tool-assisted where supported by VS Code and copy-assisted everywhere else.
+
+## AI Agent Context Bridge
+
+WorkState exposes local project context through official VS Code AI extension points:
+
+- Language Model Tools for supported agent mode workflows.
+- `@workstate` in VS Code Chat for explicit context queries.
+
+Available tools:
+
+- `workstate_get_context`
+- `workstate_get_resume_state`
+- `workstate_update_context`
+- `workstate_save_decision`
+- `workstate_reconcile`
+- `workstate_get_handoff`
+
+These tools return compact WorkState context and can save meaningful updates such as completed work, decisions, blockers, test results, and next actions. They do not expose raw `.workstate` JSON, credentials, `.env` contents, private keys, or provider chat histories.
+
+Example chat prompts:
+
+```text
+@workstate where did we leave off?
+@workstate what should I do next?
+@workstate prepare context for Claude
+@workstate reconcile my current project
+@workstate save this decision: keep auth server-side
+```
+
+WorkState does not currently read arbitrary private Codex, Claude, Copilot, or Gemini conversations. Agent access depends on stable VS Code tool/chat support in the user’s environment.
 
 ## Automatic Context Capture
 
@@ -235,17 +267,21 @@ Available settings include:
 
 ## Current Limitations
 
-- copy-assisted provider handoff only
+- agent-tool-assisted context is available only where VS Code exposes extension-contributed tools to the current agent workflow
+- copy-assisted provider handoff remains the universal fallback
 - no automatic provider conversation import
 - no automatic injection into Codex, Claude, Copilot, Gemini, or other providers
 - no direct context-window exhaustion detection
 - provider usage-limit events are unavailable unless a provider exposes a stable API
+- no MCP server in the current release
 - no WorkState cloud sync
 - no semantic/vector search
 - no Task DNA graph
 - no Agent Passport
 
 WorkState does not automatically read every AI conversation. Deeper provider integrations will be added only where official supported APIs make them reliable and appropriate.
+
+See [`docs/ai-integration-research.md`](docs/ai-integration-research.md) for the researched API boundary.
 
 ## Roadmap
 

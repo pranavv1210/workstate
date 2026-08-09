@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Added a stable VS Code AI context bridge with WorkState Language Model Tools and an `@workstate` Chat Participant.
+- Added local tool support for retrieving resume context, updating context, saving decisions, reconciling workspace evidence, and generating handoffs.
+- Documented the current VS Code AI API boundary, including stable APIs used and unsupported private provider/session capabilities.
+
 ## 0.2.3
 
 - Updated the VS Code Marketplace publisher metadata to the official publisher ID `pranavv1210`.
