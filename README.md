@@ -398,6 +398,45 @@ Run locally:
 4. Open a folder in the Extension Development Host.
 5. Open the WorkState activity bar item.
 
+## Releases
+
+GitHub repository updates and Marketplace releases are separate concepts. A push to `main` validates the project, but it does not publish a new Marketplace version unless `package.json` contains a new version and all validation steps pass.
+
+Normal development:
+
+1. Make code changes.
+2. Commit.
+3. Push to `main`.
+4. GitHub Actions validates the project.
+5. If the package version did not change, Marketplace publishing is skipped.
+
+Release:
+
+1. Complete the feature or fix.
+2. Update `package.json` version.
+3. Update `package-lock.json`.
+4. Update `CHANGELOG.md`.
+5. Commit.
+6. Push to `main`.
+7. GitHub Actions validates the project.
+8. If the new version is greater than the previous commit's version, GitHub Actions publishes it to the Visual Studio Marketplace.
+
+Example:
+
+```text
+Current Marketplace version: 0.2.3
+Development commit version: 0.2.3 -> no Marketplace publish
+Release commit version:     0.2.4 -> automatic Marketplace publish
+```
+
+Maintainers must configure this GitHub repository secret before automated publishing can work:
+
+```text
+VSCE_PAT
+```
+
+`VSCE_PAT` is used only by GitHub Actions to authenticate with the Visual Studio Marketplace publisher `pranavv1210`. Do not commit Marketplace tokens, `.env` files, or credentials to the repository.
+
 ## License
 
 MIT

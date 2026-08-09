@@ -14,6 +14,9 @@ const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.
   license: string;
   version: string;
   contributes: {
+    viewsContainers: {
+      activitybar: Array<{ id: string; title: string; icon: string }>;
+    };
     commands: Array<{ command: string; title: string }>;
     keybindings: Array<{ command: string; key: string; mac?: string; when?: string }>;
     configuration: { properties: Record<string, unknown> };
@@ -59,6 +62,11 @@ describe('package manifest', () => {
       url: 'https://github.com/pranavv1210'
     });
     expect(manifest.icon).toBe('media/workstate.png');
+    expect(manifest.contributes.viewsContainers.activitybar).toContainEqual({
+      id: 'workstate',
+      title: 'WorkState',
+      icon: 'media/workstate-activity.svg'
+    });
     expect(manifest.keywords).toEqual(expect.arrayContaining(['ai-coding', 'coding-agents', 'codex', 'claude', 'copilot', 'gemini']));
     expect(manifest.contributes.configuration.properties).toHaveProperty('workstate.notifications.enabled');
     expect(manifest.contributes.configuration.properties).toHaveProperty('workstate.notifications.welcomeBack');

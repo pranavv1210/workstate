@@ -1,0 +1,244 @@
+name: WorkState Marketplace Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.version.outputs.should_publish }}
+      current_version: ${{ steps.version.outputs.current_version }}
+      previous_version: ${{ steps.version.outputs.previous_version }}
+      vsix_path: ${{ steps.package.outputs.vsix_path }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile
+        run: npm run compile
+
+      - name: Test
+        run: npm test
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Validate manifest and version gate
+        id: version
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const cp = require('child_process');
+
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const errors = [];
+          const stableSemver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+
+          function fail(message) {
+            errors.push(message);
+          }
+
+          function exists(file) {
+            return fs.existsSync(file) && fs.statSync(file).isFile();
+          }
+
+          function parseVersion(version) {
+            const match = stableSemver.exec(version || '');
+            if (!match) {
+              return null;
+            }
+            return match.slice(1).map(Number);
+          }
+
+          function compareVersions(a, b) {
+            for (let index = 0; index < 3; index += 1) {
+              if (a[index] > b[index]) {
+                return 1;
+              }
+              if (a[index] < b[index]) {
+                return -1;
+              }
+            }
+            return 0;
+          }
+
+          if (pkg.publisher !== 'pranavv1210') fail('publisher must be pranavv1210');
+          if (pkg.name !== 'workstate') fail('name must be workstate');
+          if (pkg.displayName !== 'WorkState') fail('displayName must be WorkState');
+          if (pkg.description !== 'Preserve engineering context across AI coding sessions in VS Code.') fail('description is unexpected');
+          if (pkg.icon !== 'media/workstate.png') fail('Marketplace icon must be media/workstate.png');
+          if (!exists(pkg.icon)) fail(`Marketplace icon does not exist: ${pkg.icon}`);
+
+          const activityIcon = pkg.contributes?.viewsContainers?.activitybar?.find((item) => item.id === 'workstate')?.icon;
+          if (activityIcon !== 'media/workstate-activity.svg') fail('Activity Bar icon must be media/workstate-activity.svg');
+          if (!exists(activityIcon)) fail(`Activity Bar icon does not exist: ${activityIcon}`);
+
+          const current = parseVersion(pkg.version);
+          if (!current) fail(`version must be stable semver x.y.z: ${pkg.version}`);
+
+          let previousVersion = '';
+          try {
+            cp.execFileSync('git', ['rev-parse', '--verify', 'HEAD^'], { stdio: 'ignore' });
+            const previousPackage = cp.execFileSync('git', ['show', 'HEAD^:package.json'], { encoding: 'utf8' });
+            previousVersion = JSON.parse(previousPackage).version || '';
+          } catch {
+            previousVersion = '';
+          }
+
+          let shouldPublish = false;
+          if (previousVersion) {
+            const previous = parseVersion(previousVersion);
+            if (!previous) fail(`previous version must be stable semver x.y.z: ${previousVersion}`);
+            if (current && previous) {
+              const comparison = compareVersions(current, previous);
+              if (comparison < 0) {
+                fail(`version moved backwards from ${previousVersion} to ${pkg.version}`);
+              }
+              shouldPublish = comparison > 0;
+            }
+          }
+
+          if (errors.length > 0) {
+            for (const error of errors) {
+              console.error(error);
+            }
+            process.exit(1);
+          }
+
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `current_version=${pkg.version}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `previous_version=${previousVersion || 'none'}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `should_publish=${shouldPublish ? 'true' : 'false'}\n`);
+
+          console.log(`Current version: ${pkg.version}`);
+          console.log(`Previous version: ${previousVersion || 'none'}`);
+          console.log(`Should publish: ${shouldPublish}`);
+          NODE
+
+      - name: Package extension
+        id: package
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          VSIX_PATH="workstate-${VERSION}.vsix"
+          npx --yes @vscode/vsce package --no-dependencies --out "$VSIX_PATH"
+          npx --yes @vscode/vsce ls "$VSIX_PATH"
+          echo "vsix_path=$VSIX_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Inspect VSIX contents
+        shell: bash
+        run: |
+          python <<'PY'
+          import json
+          import re
+          import sys
+          import zipfile
+          from pathlib import Path
+
+          pkg = json.loads(Path('package.json').read_text(encoding='utf-8'))
+          vsix_path = Path(f"workstate-{pkg['version']}.vsix")
+          required = {
+              'extension/package.json',
+              'extension/readme.md',
+              'extension/changelog.md',
+              'extension/LICENSE.txt',
+              'extension/media/workstate.png',
+              'extension/media/workstate-activity.svg',
+              'extension/dist/src/extension.js',
+          }
+          forbidden_patterns = [
+              re.compile(r'(^|/)\.workstate(/|$)'),
+              re.compile(r'(^|/)test(/|$)'),
+              re.compile(r'^extension/src/'),
+              re.compile(r'(^|/)\.env($|[./])'),
+              re.compile(r'credentials', re.IGNORECASE),
+              re.compile(r'private[-_ ]?key', re.IGNORECASE),
+              re.compile(r'(^|/).*\.pem$', re.IGNORECASE),
+              re.compile(r'(^|/).*\.key$', re.IGNORECASE),
+              re.compile(r'(^|/)node_modules(/|$)'),
+          ]
+
+          with zipfile.ZipFile(vsix_path) as archive:
+              names = set(archive.namelist())
+              missing = sorted(required - names)
+              if missing:
+                  print('Missing required VSIX entries:', ', '.join(missing), file=sys.stderr)
+                  sys.exit(1)
+
+              bad = sorted(name for name in names if any(pattern.search(name) for pattern in forbidden_patterns))
+              if bad:
+                  print('Forbidden VSIX entries:', ', '.join(bad), file=sys.stderr)
+                  sys.exit(1)
+
+              internal_pkg = json.loads(archive.read('extension/package.json').decode('utf-8'))
+              checks = {
+                  'publisher': 'pranavv1210',
+                  'name': 'workstate',
+                  'displayName': 'WorkState',
+                  'version': pkg['version'],
+                  'icon': 'media/workstate.png',
+              }
+              for key, expected in checks.items():
+                  actual = internal_pkg.get(key)
+                  if actual != expected:
+                      print(f'Unexpected package.json {key}: {actual!r}', file=sys.stderr)
+                      sys.exit(1)
+
+          print(f'VSIX inspection passed: {vsix_path}')
+          PY
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: workstate-vsix
+          path: ${{ steps.package.outputs.vsix_path }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/main' && needs.validate.outputs.should_publish == 'true'
+    steps:
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: workstate-vsix
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify Marketplace token
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "VSCE_PAT GitHub Actions secret is required for Marketplace publishing." >&2
+            exit 1
+          fi
+
+      - name: Publish to Visual Studio Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npx --yes @vscode/vsce publish --packagePath "${{ needs.validate.outputs.vsix_path }}"
