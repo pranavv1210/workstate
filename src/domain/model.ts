@@ -58,6 +58,33 @@ export interface GitContext {
   unavailableReason?: string;
 }
 
+export interface WorkspaceSnapshot {
+  timestamp: string;
+  projectName: string;
+  branch?: string;
+  changedFiles: string[];
+  recentCommits: string[];
+  evidenceSummary: string[];
+}
+
+export interface ReconciliationRecord {
+  id: string;
+  timestamp: string;
+  type: 'bootstrap' | 'resume' | 'inactive_changes';
+  summary: string;
+  evidence: string[];
+  confidence: ContextConfidence;
+}
+
+export interface ContextConflict {
+  id: string;
+  timestamp: string;
+  summary: string;
+  claim: string;
+  evidence: string[];
+  status: 'needs_review' | 'accepted_claim' | 'used_workspace' | 'dismissed';
+}
+
 export interface WorkState {
   id: string;
   name: string;
@@ -78,6 +105,9 @@ export interface WorkState {
   reviewItems?: ReviewItem[];
   sessions?: AgentSession[];
   contextLayers?: ContextLayers;
+  lastSnapshot?: WorkspaceSnapshot;
+  reconciliations?: ReconciliationRecord[];
+  conflicts?: ContextConflict[];
   latestHandoff?: {
     mode: HandoffMode;
     content: string;
@@ -207,7 +237,9 @@ export function createWorkState(input: WorkStateInput): WorkState {
     memories: [],
     reviewItems: [],
     sessions: [],
-    contextLayers: emptyContextLayers()
+    contextLayers: emptyContextLayers(),
+    reconciliations: [],
+    conflicts: []
   };
 
   if (state.currentState) {
@@ -295,7 +327,25 @@ function validateWorkState(value: unknown): WorkState {
     memories: Array.isArray(state.memories) ? state.memories : [],
     reviewItems: Array.isArray(state.reviewItems) ? state.reviewItems : [],
     sessions: Array.isArray(state.sessions) ? state.sessions : [],
-    contextLayers: validateContextLayers(state.contextLayers)
+    contextLayers: validateContextLayers(state.contextLayers),
+    lastSnapshot: validateSnapshot(state.lastSnapshot),
+    reconciliations: Array.isArray(state.reconciliations) ? state.reconciliations : [],
+    conflicts: Array.isArray(state.conflicts) ? state.conflicts : []
+  };
+}
+
+function validateSnapshot(value: unknown): WorkspaceSnapshot | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const snapshot = value as Partial<WorkspaceSnapshot>;
+  return {
+    timestamp: typeof snapshot.timestamp === 'string' ? snapshot.timestamp : nowIso(),
+    projectName: typeof snapshot.projectName === 'string' ? snapshot.projectName : 'Workspace',
+    branch: typeof snapshot.branch === 'string' ? snapshot.branch : undefined,
+    changedFiles: Array.isArray(snapshot.changedFiles) ? snapshot.changedFiles : [],
+    recentCommits: Array.isArray(snapshot.recentCommits) ? snapshot.recentCommits : [],
+    evidenceSummary: Array.isArray(snapshot.evidenceSummary) ? snapshot.evidenceSummary : []
   };
 }
 

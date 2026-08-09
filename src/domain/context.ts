@@ -88,6 +88,8 @@ export function generateContinuationContext(summary: ContextSummary, state: Work
   const rejected = state?.rejectedApproaches.slice(-3) ?? [];
   const pendingReview = (state?.reviewItems ?? []).filter((item) => item.status === 'pending').slice(-3);
   const lastSession = state?.sessions?.at(-1);
+  const latestReconciliation = state?.reconciliations?.at(-1);
+  const conflicts = (state?.conflicts ?? []).filter((conflict) => conflict.status === 'needs_review').slice(-3);
   const lines = [
     'WORKSTATE CONTEXT',
     '',
@@ -125,6 +127,12 @@ export function generateContinuationContext(summary: ContextSummary, state: Work
     '',
     'Suggested context needing review:',
     listOrNone(pendingReview.map((item) => `${item.type}: ${item.content}`)),
+    '',
+    'Reconciliation:',
+    latestReconciliation ? `${latestReconciliation.summary}\n${latestReconciliation.evidence.map((item) => `- ${item}`).join('\n')}` : 'No reconciliation changes recorded.',
+    '',
+    'Conflicts / needs review:',
+    listOrNone(conflicts.map((item) => `${item.summary} Claim: ${item.claim}`)),
     '',
     'Next:',
     summary.next,

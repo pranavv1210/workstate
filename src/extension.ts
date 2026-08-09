@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import { AgentRegistry } from './agents/agentRegistry';
 import { extractContextMemories } from './context/contextExtractor';
 import { confirmReviewItem, mergeContextMemories, recordFileActivity, rejectReviewItem } from './context/contextMerger';
+import { createWorkspaceSnapshot, reconcileWorkspaceState } from './context/reconciliation';
 import { ensureWorkspaceContext, generateContinuationContext, summarizeContext } from './domain/context';
 import { generateHandoff } from './domain/handoff';
 import {
@@ -312,6 +313,7 @@ class WorkStateController implements vscode.WebviewViewProvider {
       this.store = await this.repository.load();
       this.loadError = undefined;
       await this.ensureContext(undefined, false);
+      await this.reconcileActiveContext();
       await this.maybeShowWelcomeBack();
     } catch (error) {
       this.loadError = error instanceof Error ? error.message : String(error);
@@ -329,6 +331,18 @@ class WorkStateController implements vscode.WebviewViewProvider {
     }
     await this.repository.save(this.store);
     this.refresh();
+  }
+
+  private async reconcileActiveContext(): Promise<void> {
+    const active = getActive(this.store);
+    const root = this.workspaceRoot();
+    if (!active || !root) {
+      return;
+    }
+    const git = await getGitContext(root, this.exclusions());
+    const snapshot = createWorkspaceSnapshot(this.projectName(), git);
+    this.replaceState(reconcileWorkspaceState(active, snapshot));
+    await this.persist();
   }
 
   private async save(message: string): Promise<void> {

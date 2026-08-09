@@ -77,6 +77,33 @@ WorkState observes reliable local VS Code activity such as saved files, Git bran
 
 High-confidence local signals are saved quietly. Uncertain extracted context is held for review.
 
+## Project Bootstrap
+
+WorkState can be installed halfway through an existing project. On first activation in a workspace, it creates local WorkState context without requiring a Task/Goal/Current State setup form.
+
+It reconstructs an initial project view from safe evidence such as:
+
+- current Git branch
+- changed files
+- recent commits
+- available workspace metadata
+
+Bootstrap inferences are source-aware and reviewable. WorkState does not claim to remember inaccessible historical AI conversations.
+
+## Reconciliation
+
+When VS Code restarts or WorkState resumes after being inactive, WorkState compares the previous snapshot with current workspace/Git evidence.
+
+It can detect:
+
+- new commits
+- changed files
+- branch changes
+- stale context that needs review
+- test claims that may conflict with later test-file changes
+
+The resume context includes reconciliation evidence so the next AI session sees the actual project state, not just the last saved text.
+
 ## Automatic Context Extraction
 
 WorkState includes deterministic local extraction for explicit engineering statements in captured notes/current-state updates.
@@ -141,6 +168,8 @@ Current Task DNA is a chronological timeline, not a graph.
 Review Context shows suggested context that should not be treated as confirmed yet.
 
 For example, likely next actions are saved as suggestions. You can confirm or reject them. Rejected suggestions are not promoted into trusted WorkState context.
+
+Conflicts also appear as reviewable context. WorkState does not silently choose between an AI claim and workspace evidence when they disagree.
 
 ## AI Provider Capabilities
 
@@ -210,6 +239,7 @@ Available settings include:
 - no automatic provider conversation import
 - no automatic injection into Codex, Claude, Copilot, Gemini, or other providers
 - no direct context-window exhaustion detection
+- provider usage-limit events are unavailable unless a provider exposes a stable API
 - no WorkState cloud sync
 - no semantic/vector search
 - no Task DNA graph

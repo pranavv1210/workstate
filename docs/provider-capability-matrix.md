@@ -19,3 +19,5 @@ Status values: `YES`, `NO`, `PARTIAL`, `PROPOSED`, `UNKNOWN`.
 - GitHub Copilot is marked `PARTIAL` for stable API because VS Code supports chat participants, language model APIs, language model tools, and MCP tools, but those APIs do not grant general read/write access to private Copilot chat sessions.
 - Proposed APIs are not used for Marketplace release behavior because WorkState must stay stable, installable, and honest.
 - The current fallback is provider-independent copy-assisted handoff.
+- AI usage-limit and context-window exhaustion events are not exposed through the stable APIs researched here. WorkState therefore preserves/reconstructs state from reliable surrounding evidence: explicit captures, workspace saves, Git branch/changed-file state, recent commits, and prior WorkState snapshots.
+- When provider events become available through stable APIs, they should be added as provider-specific adapters without changing the project-owned context model.
