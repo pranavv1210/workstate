@@ -2,13 +2,13 @@
   "name": "workstate",
   "displayName": "WorkState",
   "description": "Preserve engineering context across AI coding sessions in VS Code.",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "author": {
     "name": "Pranav",
     "url": "https://github.com/pranavv1210"
   },
   "icon": "media/workstate.png",
-  "publisher": "workstate",
+  "publisher": "pranavv1210",
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -7,6 +7,12 @@ const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.
   description: string;
   icon: string;
   keywords: string[];
+  name: string;
+  displayName: string;
+  publisher: string;
+  repository: { type: string; url: string };
+  license: string;
+  version: string;
   contributes: {
     commands: Array<{ command: string; title: string }>;
     keybindings: Array<{ command: string; key: string; mac?: string; when?: string }>;
@@ -38,7 +44,16 @@ describe('package manifest', () => {
   });
 
   it('includes creator metadata and notification settings', () => {
+    expect(manifest.name).toBe('workstate');
+    expect(manifest.displayName).toBe('WorkState');
+    expect(manifest.publisher).toBe('pranavv1210');
+    expect(manifest.version).toBe('0.2.3');
     expect(manifest.description).toBe('Preserve engineering context across AI coding sessions in VS Code.');
+    expect(manifest.repository).toEqual({
+      type: 'git',
+      url: 'https://github.com/pranavv1210/workstate.git'
+    });
+    expect(manifest.license).toBe('MIT');
     expect(manifest.author).toEqual({
       name: 'Pranav',
       url: 'https://github.com/pranavv1210'

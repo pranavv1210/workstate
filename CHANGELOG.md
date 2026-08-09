@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3
+
+- Updated the VS Code Marketplace publisher metadata to the official publisher ID `pranavv1210`.
+- Prepared the package manifest for the first public Marketplace release without changing extension functionality.
+
 ## 0.2.2
 
 - Repositioned Marketplace and README copy around WorkState as a local-first engineering context layer for AI coding workflows.
