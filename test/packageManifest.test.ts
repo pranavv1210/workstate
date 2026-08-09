@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')) as {
   author: { name: string; url: string };
+  icon: string;
   contributes: {
     commands: Array<{ command: string; title: string }>;
     keybindings: Array<{ command: string; key: string; mac?: string; when?: string }>;
@@ -39,6 +40,7 @@ describe('package manifest', () => {
       name: 'Pranav',
       url: 'https://github.com/pranavv1210'
     });
+    expect(manifest.icon).toBe('media/workstate.png');
     expect(manifest.contributes.configuration.properties).toHaveProperty('workstate.notifications.enabled');
     expect(manifest.contributes.configuration.properties).toHaveProperty('workstate.notifications.welcomeBack');
     expect(manifest.contributes.configuration.properties).toHaveProperty('workstate.notifications.significantChanges');
